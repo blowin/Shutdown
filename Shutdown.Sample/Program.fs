@@ -7,7 +7,11 @@ let printResult (res: Result<_, _>) =
     | Error e -> printfn "Error(%O)" e
 
 let startTimer (time: TimeSpan) =
-    let option = { Action = ShutdownAction.Shutdown; WaitTime = TimeInSecond.Time time; CloseType = CloseType.CloseWindowsWithoutSave}
+    let option = ShutdownOption.create ShutdownAction.Shutdown CloseType.CloseWindowsWithoutSave (TimeInSecond.Time time)
+    Shutdown.exec option
+
+let startTimerDirectCreate (time: TimeSpan) =
+    let option = { Action = ShutdownAction.Shutdown; WaitTime = TimeInSecond.Time time; CloseType = CloseType.CloseWindowsWithoutSave; Message = Message.Msg "Custom message"}
     Shutdown.exec option
 
 let stopTimer() =
@@ -15,7 +19,7 @@ let stopTimer() =
 
 [<EntryPoint>]
 let main argv =
-    startTimer (TimeSpan.FromMinutes(30.)) |> printResult
+    startTimerDirectCreate (TimeSpan.FromMinutes(30.)) |> printResult
     stopTimer() |> printResult
     Console.ReadKey() |> ignore 
     0

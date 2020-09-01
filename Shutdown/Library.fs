@@ -20,10 +20,16 @@ type TimeInSecond =
     | Time of TimeSpan
     | None
 
+[<Struct>]
+type Message =
+    | Msg of string
+    | None
+
 type ShutdownOption = {
     Action: ShutdownAction
     WaitTime: TimeInSecond
     CloseType: CloseType
+    Message: Message
 }
 
 [<Struct>]
@@ -32,6 +38,12 @@ type ExecuteInfo = {
     Arguments: string list
 }
 
+module private Message =
+    let inline format (msg: Message) =
+        match msg with
+        | Msg msg -> sprintf "/c \"%s\"" msg
+        | _ -> ""
+
 module private WaitTime =
     let format (time: TimeInSecond) =
         match time with
@@ -39,20 +51,24 @@ module private WaitTime =
         | _ -> ""
 
 module private CloseType =
-    let format (closeType: CloseType) =
+    let inline format (closeType: CloseType) =
         match closeType with
             | CloseWindowsWithoutSave -> "/f"
             | SoftWindowsClose -> "/soft"
             
 module private ShutdownAction =
-    let format (action: ShutdownAction) =
+    let inline format (action: ShutdownAction) =
         match action with
         | Restart -> "/r"
         | Shutdown -> "/s"
  
 module private ExecuteInfo =
-    let create arguments =
+    let inline create arguments =
         { FileName = "shutdown.exe"; Arguments = arguments}
+    
+module ShutdownOption =
+    let create action closeType waitTime =
+        { Action = action; CloseType = closeType; WaitTime = waitTime; Message = Message.None }
             
 module Shutdown =
     type Arguments = string list
@@ -75,8 +91,9 @@ module Shutdown =
             |> appendMap option (fun x -> ShutdownAction.format x.Action)
             |> appendMap option (fun x -> CloseType.format x.CloseType)
             |> appendMapNotEmpty option (fun x -> WaitTime.format x.WaitTime)
+            |> appendMapNotEmpty option (fun x -> Message.format x.Message)
             |> ExecuteInfo.create
-         
+                  
     let private execExecuteInfo (info: ExecuteInfo) =
           try
             let startInfo = ProcessStartInfo()
@@ -92,7 +109,7 @@ module Shutdown =
             
             with
                 | Failure ex -> Error ex
-            
+                        
     let stop() =
         list.Empty
         |> append "/a"
