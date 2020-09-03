@@ -8,14 +8,18 @@ let printResult (res: Result<_, _>) =
 
 let startTimer (time: TimeSpan) =
     let option = ShutdownOption.create ShutdownAction.Shutdown CloseType.CloseWindowsWithoutSave (TimeInSecond.Time time)
-    Shutdown.exec option
+    ShutdownLib.exec option
 
 let startTimerDirectCreate (time: TimeSpan) =
-    let option = { Action = ShutdownAction.Shutdown; WaitTime = TimeInSecond.Time time; CloseType = CloseType.CloseWindowsWithoutSave; Message = Message.Msg "Custom message"}
-    Shutdown.exec option
+    let msg = Message.createMsg "Custom message"
+    match msg with
+    | Ok msg -> 
+        let option = { Action = ShutdownAction.Shutdown; WaitTime = TimeInSecond.Time time; CloseType = CloseType.CloseWindowsWithoutSave; Message = msg}
+        ShutdownLib.exec option
+    | Error err -> Error err
 
 let stopTimer() =
-    Shutdown.stop()
+    ShutdownLib.stop()
 
 [<EntryPoint>]
 let main argv =

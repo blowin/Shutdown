@@ -1,9 +1,7 @@
 ﻿namespace Shutdown
 
 open System
-open System.Collections.ObjectModel
 open System.Diagnostics
-open System.Text
 
 [<Struct>]
 type ShutdownAction =
@@ -22,9 +20,10 @@ type TimeInSecond =
 
 [<Struct>]
 type Message =
-    | Msg of string
+    private | Msg of string
     | None
 
+[<Struct>]
 type ShutdownOption = {
     Action: ShutdownAction
     WaitTime: TimeInSecond
@@ -38,23 +37,24 @@ type ExecuteInfo = {
     Arguments: string list
 }
 
-module private Message =
-    let inline format (msg: Message) =
-        match msg with
-        | Msg msg -> sprintf "/c \"%s\"" msg
+module private CloseType =
+    let format (closeType: CloseType) =
+        match closeType with
+        | CloseWindowsWithoutSave -> "/f"
         | _ -> ""
+
+module Message =
+    let createMsg (str: string) =
+        if str = null || str.Length > 512 then Error "Сообщение не должно быть больше 512 символов"
+        else Ok (Message.Msg str)
+
+    let createNone() = Message.None
 
 module private WaitTime =
     let format (time: TimeInSecond) =
         match time with
         | Time t -> sprintf "/t \"%d\"" (int t.TotalSeconds)
         | _ -> ""
-
-module private CloseType =
-    let inline format (closeType: CloseType) =
-        match closeType with
-            | CloseWindowsWithoutSave -> "/f"
-            | SoftWindowsClose -> "/soft"
             
 module private ShutdownAction =
     let inline format (action: ShutdownAction) =
@@ -68,9 +68,9 @@ module private ExecuteInfo =
     
 module ShutdownOption =
     let create action closeType waitTime =
-        { Action = action; CloseType = closeType; WaitTime = waitTime; Message = Message.None }
+        { Action = action; WaitTime = waitTime; CloseType = closeType; Message = Message.None }
             
-module Shutdown =
+module ShutdownLib =
     type Arguments = string list
     
     let inline private append (str: string) (builder: Arguments) =
@@ -79,19 +79,23 @@ module Shutdown =
     let inline private appendMap<'a> (value: 'a) (map: 'a -> string) (builder: Arguments) =
         builder
         |> append (map value)
-        
+       
     let inline private appendMapNotEmpty<'a> (value: 'a) (map: 'a -> string) (builder: Arguments) =
-        let mapValue = map value
-        match mapValue with
+        match (map value) with
         | "" | null -> builder
-        | v -> builder |> append v
-            
+        | value -> builder |> append value
+       
+    let inline private formatMessage (msg: Message) =
+        match msg with
+        | Msg msg -> sprintf "/c \"%s\"" msg
+        | _ -> ""
+
     let inline private asExecuteInfo (option: ShutdownOption) =
         list.Empty
             |> appendMap option (fun x -> ShutdownAction.format x.Action)
-            |> appendMap option (fun x -> CloseType.format x.CloseType)
             |> appendMapNotEmpty option (fun x -> WaitTime.format x.WaitTime)
-            |> appendMapNotEmpty option (fun x -> Message.format x.Message)
+            |> appendMapNotEmpty option (fun x -> formatMessage x.Message)
+            |> appendMapNotEmpty option (fun x -> CloseType.format x.CloseType)
             |> ExecuteInfo.create
                   
     let private execExecuteInfo (info: ExecuteInfo) =
